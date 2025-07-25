@@ -1,103 +1,127 @@
-import Image from "next/image";
+'use client'
 
-export default function Home() {
+import { useState, useEffect } from 'react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ReferenceCard } from '@/components/reference-card'
+import { TranslationSkeleton } from '@/components/translation-skeleton'
+import { SearchBar } from '@/components/search-bar'
+import { useSupabase } from '@/components/providers'
+import { useRouter } from 'next/navigation'
+
+export default function HomePage() {
+  const [activeTab, setActiveTab] = useState('recent')
+  const [recentTexts, setRecentTexts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState<any>(null)
+  const { supabase } = useSupabase()
+  const router = useRouter()
+
+  useEffect(() => {
+    checkUser()
+  }, [])
+
+  const checkUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    setUser(user)
+    if (user) {
+      loadRecentTexts()
+    } else {
+      setLoading(false)
+    }
+  }
+
+  const loadRecentTexts = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data, error } = await supabase
+        .from('user_journeys')
+        .select(`
+          id,
+          sefaria_ref,
+          visited_at,
+          translations(
+            hebrew_text,
+            english_translation,
+            created_at
+          )
+        `)
+        .eq('user_id', user.id)
+        .order('visited_at', { ascending: false })
+        .limit(10)
+
+      if (error) {
+        console.error('Database error:', error)
+        return
+      }
+      
+      setRecentTexts(data || [])
+    } catch (error) {
+      console.error('Error loading recent texts:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleNavigate = (ref: string) => {
+    router.push(`/text/${encodeURIComponent(ref)}`)
+  }
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+    <div className="container mx-auto py-8 max-w-6xl">
+      <h1 className="text-3xl font-bold mb-8 text-center">Talmudic Study App</h1>
+      
+      <SearchBar />
+      
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="mb-6">
+          <TabsTrigger value="recent">Recent</TabsTrigger>
+          <TabsTrigger value="sessions">Sessions</TabsTrigger>
+          <TabsTrigger value="bookmarks">Bookmarks</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="recent" className="space-y-4">
+          {loading ? (
+            <>
+              <TranslationSkeleton showMetrics />
+              <TranslationSkeleton showMetrics />
+              <TranslationSkeleton showMetrics />
+            </>
+          ) : recentTexts.length > 0 ? (
+            recentTexts.map((journey) => (
+              <ReferenceCard
+                key={journey.id}
+                sefariaRef={journey.sefaria_ref}
+                hebrewText={journey.translations?.hebrew_text || ''}
+                englishTranslation={journey.translations?.english_translation}
+                metrics={{
+                  translatedAt: journey.translations?.created_at,
+                  lastViewed: journey.visited_at,
+                  viewCount: journey.metrics?.views || 1,
+                }}
+                onNavigate={handleNavigate}
+              />
+            ))
+          ) : (
+            <div className="text-center py-12 text-muted-foreground">
+              <p>No recent texts. Start by searching for a text above.</p>
+            </div>
+          )}
+        </TabsContent>
+        
+        <TabsContent value="sessions">
+          <div className="text-center py-12 text-muted-foreground">
+            <p>Study sessions coming soon...</p>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="bookmarks">
+          <div className="text-center py-12 text-muted-foreground">
+            <p>Bookmarks coming soon...</p>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
-  );
+  )
 }
